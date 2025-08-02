@@ -183,6 +183,9 @@ pub mod python_utils {
         })
     }
 
+    ///
+    ///
+    ///
     pub fn py_exec(
         pymod: &RUMPyModule,
         func_name: &str,
@@ -238,8 +241,24 @@ pub mod python_macros {
         ( $mod_path:expr ) => {{
             use compact_str::format_compact;
             use pyo3::{prelude::*, types::IntoPyDict};
-            use $crate::scripting::python_utils::py_load;
-            let pymod = py_load($mod_path)
+            use $crate::scripting::python_utils::{py_exec, py_load};
+            let pymod = py_load($mod_path)?;
+        }};
+        ( $mod_path:expr, $func_name:expr ) => {{
+            use compact_str::format_compact;
+            use pyo3::{prelude::*, types::IntoPyDict};
+            use $crate::scripting::python_utils::{py_buildargs, py_exec, py_load};
+            let pymod = py_load($mod_path)?;
+            let args = py_buildargs(&vec![])?;
+            py_exec(pymod, $func_name, &args)
+        }};
+        ( $mod_path:expr, $func_name:expr, $($args:expr),+ ) => {{
+            use compact_str::format_compact;
+            use pyo3::{prelude::*, types::IntoPyDict};
+            use $crate::scripting::python_utils::{py_buildargs, py_exec, py_load};
+            let pymod = py_load($mod_path)?;
+            let args = py_buildargs(&vec![$($arg_items:expr),+])?;
+            py_exec(pymod, $func_name, &args)
         }};
     }
 }
