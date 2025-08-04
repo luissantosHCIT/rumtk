@@ -30,9 +30,11 @@ pub mod python_utils {
     use pyo3::types::{PyList, PyTuple};
 
     pub type RUMPyArgs = Py<PyList>;
+    pub type RUMPyResult = Vec<RUMString>;
     pub type RUMPyModule = Py<PyModule>;
     pub type RUMPyTuple = Py<PyTuple>;
     pub type RUMPyFunction = Py<PyAny>;
+    pub type RUMPyAny = Py<PyAny>;
 
     fn string_to_cstring(data: &str) -> RUMResult<CString> {
         match CString::new(data) {
@@ -64,12 +66,12 @@ pub mod python_utils {
     ///
     /// ```
     ///     use compact_str::format_compact;
-    ///     use crate::rumtk_core::scripting::python_utils::{py_buildargs, py_extract};
+    ///     use crate::rumtk_core::scripting::python_utils::{py_buildargs, py_extract_string_vector};
     ///
     ///     let expect: Vec<&str> = vec!["a", "1", "2"];
     ///
     ///     let py_obj = py_buildargs(&expect).unwrap();
-    ///     let result = py_extract(&py_obj).unwrap();
+    ///     let result = py_extract_string_vector(&py_obj).unwrap();
     ///     assert_eq!(&result, &expect, "{}", format_compact!("Python list does not match the input list!\nGot: {:?}\nExpected: {:?}", &result, &expect));
     /// ```
     ///
@@ -88,8 +90,18 @@ pub mod python_utils {
         })
     }
 
-    pub fn py_extract(pyargs: &RUMPyArgs) -> RUMResult<Vec<String>> {
-        Python::with_gil(|py| -> RUMResult<Vec<String>> {
+    fn string_vector_to_rumstring_vector(list: &Vec<String>) -> RUMPyResult {
+        let mut rumstring_vector = Vec::<RUMString>::with_capacity(list.len());
+
+        for itm in list {
+            rumstring_vector.push(RUMString::from(itm));
+        }
+
+        rumstring_vector
+    }
+
+    pub fn py_extract_string_vector(pyargs: &RUMPyArgs) -> RUMResult<RUMPyResult> {
+        Python::with_gil(|py| -> RUMResult<RUMPyResult> {
             let py_list: Vec<String> = match pyargs.extract(py) {
                 Ok(list) => list,
                 Err(e) => {
@@ -99,7 +111,7 @@ pub mod python_utils {
                     ));
                 }
             };
-            Ok(py_list)
+            Ok(string_vector_to_rumstring_vector(&py_list))
         })
     }
 
@@ -116,13 +128,8 @@ pub mod python_utils {
                 ))
             }
         };
-        let mut rumstring_vector = Vec::<RUMString>::with_capacity(pyresult_vec.len());
 
-        for itm in pyresult_vec {
-            rumstring_vector.push(RUMString::from(itm));
-        }
-
-        Ok(rumstring_vector)
+        Ok(string_vector_to_rumstring_vector(&pyresult_vec))
     }
 
     ///
@@ -202,7 +209,7 @@ pub mod python_utils {
                     ));
                 }
             };
-            let result: RUMPyTuple = match pyfunc.call1(py, &args) {
+            let result: RUMPyAny = match pyfunc.call1(py, args.into()) {
                 Ok(r) => r.into(),
                 Err(e) => {
                     return Err(format_compact!(
