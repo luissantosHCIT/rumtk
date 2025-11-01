@@ -18,14 +18,14 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-
-use core::hash::Hash;
-use std::sync::Arc;
 pub use ahash::AHashMap;
+use core::hash::Hash;
 pub use once_cell::unsync::Lazy;
+use std::sync::Arc;
 pub use std::sync::Mutex;
 /**************************** Constants**************************************/
-pub const DEFAULT_CACHE_PAGE_SIZE: usize = 10; /// I don't think most scenarios will need more than 10 items worth of memory pre-allocated at a time.
+pub const DEFAULT_CACHE_PAGE_SIZE: usize = 10;
+/// I don't think most scenarios will need more than 10 items worth of memory pre-allocated at a time.
 /**************************** Caches ****************************************/
 
 /**************************** Types *****************************************/
@@ -40,14 +40,18 @@ pub type LazyRUMCache<K, V> = Lazy<Arc<RUMCache<K, V>>>;
 
 /**************************** Helpers ***************************************/
 pub const fn new_cache<K, V>() -> LazyRUMCache<K, V> {
-    LazyRUMCache::new(|| { Arc::new(RUMCache::with_capacity(DEFAULT_CACHE_PAGE_SIZE)) })
+    LazyRUMCache::new(|| Arc::new(RUMCache::with_capacity(DEFAULT_CACHE_PAGE_SIZE)))
 }
 
-pub fn get_or_set_from_cache<K, V, F>(cache: &'static mut LazyRUMCache<K, V>, expr: &K, new_fn: F) -> &'static V
+pub fn get_or_set_from_cache<K, V, F>(
+    cache: &'static mut LazyRUMCache<K, V>,
+    expr: &K,
+    new_fn: F,
+) -> &'static V
 where
     K: Hash + Eq + Clone,
     V: Clone,
-    F: Fn(&K) -> V
+    F: Fn(&K) -> V,
 {
     if !cache.contains_key(expr) {
         let mut cache_ref = Arc::get_mut(cache).unwrap();
@@ -56,16 +60,42 @@ where
     cache.get(expr).unwrap()
 }
 
-
 pub mod cache_macros {
+    ///
+    /// Searches for item in global cache. If global cache lacks item, create item using factory
+    /// function passed to this macro.
+    ///
+    /// ```
+    /// use crate::rumtk_core::rumtk_cache_fetch;
+    /// use crate::rumtk_core::cache::{new_cache, LazyRUMCache};
+    /// use std::sync::Arc;
+    ///
+    /// type StringCache = LazyRUMCache<String, String>;
+    ///
+    /// fn init_cache(k: &str) -> String {
+    ///    String::from(k)
+    /// }
+    ///
+    /// let cache: StringCache = new_cache();
+    ///
+    /// let test_key: &str = "Hello World";
+    /// let v = rumtk_cache_fetch!(
+    ///     &cache,
+    ///     &test_key,
+    ///     init_cache
+    /// );
+    ///
+    /// assert_eq!(cache.len(), 1, format!("Cache item missing in test. Cache: {:?}", &cache));
+    /// assert_eq!(&test_key, &v, "The inserted key is not the same to what was passed as input!");
+    ///
+    ///
+    /// ```
+    ///
     #[macro_export]
     macro_rules! rumtk_cache_fetch {
         ( $cache:expr, $key:expr, $func:expr ) => {{
             use $crate::cache::get_or_set_from_cache;
-            unsafe {
-                get_or_set_from_cache($cache, $key, $func)
-            }
+            unsafe { get_or_set_from_cache($cache, $key, $func) }
         }};
     }
 }
-
