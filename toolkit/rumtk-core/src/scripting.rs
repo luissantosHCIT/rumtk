@@ -20,22 +20,26 @@
 
 pub mod python_utils {
     use std::ffi::{CString, OsStr};
+    use std::fmt::Debug;
     use std::fs::read_to_string;
     use std::path::Path;
 
     use crate::core::RUMResult;
     use crate::strings::RUMString;
     use compact_str::format_compact;
+    use pyo3::impl_::pyclass::ExtractPyClassWithClone;
     use pyo3::prelude::*;
-    use pyo3::types::PyTuple;
+    use pyo3::types::{PyList, PyTuple};
     use pyo3::PyClass;
 
     pub type RUMPyArgs = Py<PyTuple>;
+    pub type RUMPyList = Py<PyList>;
     pub type RUMPyResult = Vec<RUMString>;
     pub type RUMPyModule = Py<PyModule>;
     pub type RUMPyTuple = Py<PyTuple>;
     pub type RUMPyFunction = Py<PyAny>;
     pub type RUMPyAny = Py<PyAny>;
+    pub type RUMPython<'py> = Python<'py>;
 
     fn string_to_cstring(data: &str) -> RUMResult<CString> {
         match CString::new(data) {
@@ -60,33 +64,123 @@ pub mod python_utils {
         }
     }
 
+    pub fn py_list_to_tuple(py: RUMPython, py_list: &RUMPyList) -> RUMResult<RUMPyTuple> {
+        match PyTuple::new(py, py_list.bind(py).iter()) {
+            Ok(py_args) => Ok(py_args.into()),
+            Err(e) => Err(format_compact!(
+                "Failed to convert arguments from PyList to PyTuple! Reason: {:?}",
+                e
+            )),
+        }
+    }
+
     ///
-    /// Convert a vector of strings to a Python List of strings.
+    /// Convert a vector of `T` to a Python List of `T`.
     ///
     /// ## Example
     ///
     /// ```
     ///     use compact_str::format_compact;
-    ///     use crate::rumtk_core::scripting::python_utils::{py_buildargs, py_extract_string_vector};
+    ///     use pyo3::Python;
+    ///     use crate::rumtk_core::scripting::python_utils::{py_buildargs, py_extract_string_vector, py_list_to_tuple};
     ///
     ///     let expect: Vec<&str> = vec!["a", "1", "2"];
     ///
-    ///     let py_obj = py_buildargs(&expect).unwrap();
-    ///     let result = py_extract_string_vector(&py_obj).unwrap();
-    ///     assert_eq!(&result, &expect, "{}", format_compact!("Python list does not match the input list!\nGot: {:?}\nExpected: {:?}", &result, &expect));
+    ///     Python::attach( |py| {
+    ///             let py_args = py_buildargs(py, &expect).unwrap();
+    ///             let py_obj = py_list_to_tuple(py, &py_args).unwrap();
+    ///             let result = py_extract_string_vector(&py_obj).unwrap();
+    ///             assert_eq!(&result, &expect, "{}", format_compact!("Python list does not match the input list!\nGot: {:?}\nExpected: {:?}", &result, &expect));
+    ///         }
+    ///     )
     /// ```
     ///
-    pub fn py_buildargs(arg_list: &Vec<&str>) -> RUMResult<RUMPyArgs> {
-        Python::with_gil(|py| -> RUMResult<RUMPyArgs> {
-            match PyTuple::new(py, arg_list){
-                Ok(pylist) => Ok(pylist.into()),
-                Err(e) => Err(format_compact!(
-                    "Could not convert argument list {:#?} into a Python args list because of {:#?}!",
-                    &arg_list,
-                    e
-                ))
-            }
-        })
+    pub fn py_buildargs<'a, 'py, T>(py: RUMPython<'py>, args: &Vec<T>) -> RUMResult<RUMPyList>
+    where
+        T: FromPyObject<'a, 'py> + IntoPyObject<'py> + Debug + Clone,
+    {
+        match PyList::new(py, args.clone()) {
+            Ok(py_args) => Ok(py_args.into()),
+            Err(e) => Err(
+                format_compact!(
+                    "Failed to convert arguments into a Python Object for transfer to Interpreter! Arguments: {:?} Reason: {:?}",
+                    &args,
+                    e.to_string()
+                )
+            )
+        }
+    }
+
+    ///
+    /// Create empty Python List, which can be used for creating a collection of arguments to pass
+    /// to script.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    ///     use compact_str::format_compact;
+    ///     use pyo3::Python;
+    ///     use pyo3::types::{PyListMethods, PyAnyMethods};
+    ///     use rumtk_core::scripting::python_utils::{py_new_args, py_push_arg, RUMPyArgs, RUMPyList};
+    ///     use crate::rumtk_core::scripting::python_utils::{py_buildargs, py_extract_string_vector};
+    ///
+    ///
+    ///     Python::attach( |py| {
+    ///             let example_arg_1 = 1;
+    ///             let example_arg_2 = "Hello";
+    ///             let py_args: RUMPyList = py_new_args(py);
+    ///             py_push_arg(py, &py_args, example_arg_1.clone()).unwrap();
+    ///             py_push_arg(py, &py_args, example_arg_2.clone()).unwrap();
+    ///             let arg_1: usize = py_args.bind(py).get_item(0).unwrap().extract().unwrap();
+    ///             assert_eq!(&example_arg_1, &arg_1, "{}", format_compact!("Python list does not match the input list!\nGot: {:?}\nExpected: {:?}", &arg_1, &example_arg_1));
+    ///         }
+    ///     )
+    /// ```
+    ///
+    pub fn py_new_args(py: RUMPython) -> RUMPyList {
+        PyList::empty(py).unbind()
+    }
+
+    ///
+    /// Push argument of type `T` into instance of Python List. We can then use the list to pass
+    /// arguments to Python function or method.
+    ///
+    /// ## Example
+    ///
+    /// ```
+    ///     use compact_str::format_compact;
+    ///     use pyo3::Python;
+    ///     use pyo3::types::{PyListMethods, PyAnyMethods};
+    ///     use rumtk_core::scripting::python_utils::{py_new_args, py_push_arg, RUMPyArgs, RUMPyList};
+    ///     use crate::rumtk_core::scripting::python_utils::{py_buildargs, py_extract_string_vector};
+    ///
+    ///
+    ///     Python::attach( |py| {
+    ///             let example_arg_1 = 1;
+    ///             let example_arg_2 = "Hello";
+    ///             let py_args: RUMPyList = py_new_args(py);
+    ///             py_push_arg(py, &py_args, example_arg_1.clone()).unwrap();
+    ///             py_push_arg(py, &py_args, example_arg_2.clone()).unwrap();
+    ///             let arg_1: usize = py_args.bind(py).get_item(0).unwrap().extract().unwrap();
+    ///             assert_eq!(&example_arg_1, &arg_1, "{}", format_compact!("Python list does not match the input list!\nGot: {:?}\nExpected: {:?}", &arg_1, &example_arg_1));
+    ///         }
+    ///     )
+    /// ```
+    ///
+    pub fn py_push_arg<'a, 'py, T>(py: RUMPython<'py>, py_args: &RUMPyList, arg: T) -> RUMResult<()>
+    where
+        T: FromPyObject<'a, 'py> + IntoPyObject<'py> + Debug + Clone,
+    {
+        match py_args.bind(py).append(arg.clone()) {
+            Ok(_) => Ok(()),
+            Err(e) => Err(
+                format_compact!(
+                    "Failed to convert argument into a Python Object for transfer to Interpreter! Argument: {:?} Reason: {:?}",
+                    &arg,
+                    e.to_string()
+                )
+            )
+        }
     }
 
     fn string_vector_to_rumstring_vector(list: &Vec<String>) -> RUMPyResult {
@@ -114,23 +208,6 @@ pub mod python_utils {
         })
     }
 
-    fn py_extract_string_tuple<'py>(
-        py: &Python<'py>,
-        pyresult: &RUMPyTuple,
-    ) -> RUMResult<Vec<RUMString>> {
-        let pyresult_vec: Vec<String> = match pyresult.extract(*py) {
-            Ok(vec) => vec,
-            Err(e) => {
-                return Err(format_compact!(
-                    "Could not extract vector from Python result! Reason => {:?}",
-                    e
-                ))
-            }
-        };
-
-        Ok(string_vector_to_rumstring_vector(&pyresult_vec))
-    }
-
     ///
     /// Extract value returned from functions and modules via a `PyAny` object.
     ///
@@ -139,11 +216,13 @@ pub mod python_utils {
     ///
     /// ```
     ///
-    pub fn py_extract_any<'py, T>(py: Python<'py>, pyresult: PyObject) -> RUMResult<T>
+    pub fn py_extract_any<'a, 'py, T>(py: Python<'py>, pyresult: &'a RUMPyAny) -> RUMResult<T>
     where
-        T: FromPyObject<'py>,
+        T: FromPyObject<'a, 'py>,
+        <T as pyo3::FromPyObject<'a, 'py>>::Error: Debug,
+        'py: 'a,
     {
-        match pyresult.extract::<T>(py) {
+        match pyresult.extract(py) {
             Ok(r) => Ok(r),
             Err(e) => Err(format_compact!(
                 "Could not extract vector from Python result! Reason => {:?}",
@@ -185,7 +264,7 @@ pub mod python_utils {
                 ));
             }
         };
-        Python::with_gil(|py| -> RUMResult<RUMPyModule> {
+        Python::attach(|py| -> RUMResult<RUMPyModule> {
             let filename = match pypath.file_name() {
                 Some(name) => ostring_to_cstring(name)?,
                 None => {
@@ -238,11 +317,11 @@ pub mod python_utils {
     ///
     pub fn py_exec<T>(pymod: &RUMPyModule, func_name: &str, args: &RUMPyArgs) -> RUMResult<T>
     where
-        T: Clone + PyClass,
+        T: Clone + PyClass + ExtractPyClassWithClone,
     {
-        Python::with_gil(|py| -> RUMResult<T> {
+        Python::with_gil(move |py| -> RUMResult<T> {
             let pyfunc: RUMPyFunction = match pymod.getattr(py, func_name) {
-                Ok(f) => f.into(),
+                Ok(f) => f,
                 Err(e) => {
                     return Err(format_compact!(
                         "No function named {} found in module! Error: {:#?}",
@@ -252,7 +331,7 @@ pub mod python_utils {
                 }
             };
             match pyfunc.call1(py, args) {
-                Ok(r) => py_extract_any(py, r),
+                Ok(r) => py_extract_any(py, &r),
                 Err(e) => Err(format_compact!(
                     "An error occurred executing Python function {}. Error: {}",
                     &func_name,
