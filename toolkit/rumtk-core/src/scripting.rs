@@ -27,10 +27,8 @@ pub mod python_utils {
     use crate::core::RUMResult;
     use crate::strings::RUMString;
     use compact_str::format_compact;
-    use pyo3::impl_::pyclass::ExtractPyClassWithClone;
     use pyo3::prelude::*;
     use pyo3::types::{PyList, PyTuple};
-    use pyo3::PyClass;
 
     pub type RUMPyArgs = Py<PyTuple>;
     pub type RUMPyList = Py<PyList>;
@@ -213,12 +211,26 @@ pub mod python_utils {
     ///
     /// ## Example Usage
     /// ```
+    ///use compact_str::format_compact;
+    ///     use pyo3::Python;
+    ///     use pyo3::types::{PyListMethods, PyAnyMethods, PyString};
+    ///     use rumtk_core::scripting::python_utils::{py_extract_any, py_new_args, py_push_arg, RUMPyArgs, RUMPyList};
+    ///     use crate::rumtk_core::scripting::python_utils::{py_buildargs, py_extract_string_vector};
     ///
+    ///
+    ///     Python::attach( |py| {
+    ///             let example_arg_1 = "Hello";
+    ///             let py_arg = PyString::new(py, example_arg_1);
+    ///             let arg: String = py_arg.extract().unwrap();
+    ///             let arg_1: String = py_extract_any(py, &py_arg.as_any().clone().unbind()).unwrap();
+    ///             assert_eq!(&example_arg_1, &arg_1, "{}", format_compact!("Python conversion failed!\nGot: {:?}\nExpected: {:?}", &arg_1, &example_arg_1));
+    ///         }
+    ///     )
     /// ```
     ///
     pub fn py_extract_any<'a, 'py, T>(py: Python<'py>, pyresult: &'a RUMPyAny) -> RUMResult<T>
     where
-        T: FromPyObject<'a, 'py>,
+        T: FromPyObject<'a, 'py> + Clone,
         <T as pyo3::FromPyObject<'a, 'py>>::Error: Debug,
         'py: 'a,
     {
@@ -315,11 +327,19 @@ pub mod python_utils {
     ///     std::fs::remove_file(&fpath).unwrap()
     ///```
     ///
-    pub fn py_exec<T>(pymod: &RUMPyModule, func_name: &str, args: &RUMPyArgs) -> RUMResult<T>
+    fn t() {}
+    /*
+    pub fn py_exec<'a, 'py, T>(
+        pymod: &RUMPyModule,
+        func_name: &str,
+        args: &RUMPyList,
+    ) -> RUMResult<T>
     where
-        T: Clone + PyClass + ExtractPyClassWithClone,
+        T: FromPyObject<'a, 'py> + ExtractPyClassWithClone + Clone,
+        <T as pyo3::FromPyObject<'a, 'py>>::Error: Debug,
+        'py: 'a,
     {
-        Python::with_gil(move |py| -> RUMResult<T> {
+        Python::attach(|py| -> RUMResult<T> {
             let pyfunc: RUMPyFunction = match pymod.getattr(py, func_name) {
                 Ok(f) => f,
                 Err(e) => {
@@ -330,7 +350,7 @@ pub mod python_utils {
                     ));
                 }
             };
-            match pyfunc.call1(py, args) {
+            match pyfunc.call1(py, py_list_to_tuple(py, args)?) {
                 Ok(r) => py_extract_any(py, &r),
                 Err(e) => Err(format_compact!(
                     "An error occurred executing Python function {}. Error: {}",
@@ -340,6 +360,8 @@ pub mod python_utils {
             }
         })
     }
+
+     */
 }
 
 pub mod python_macros {
