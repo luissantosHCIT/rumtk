@@ -44,7 +44,7 @@ mod tests {
     use crate::search::rumtk_search::*;
     use crate::strings::{RUMArrayConversions, RUMString, RUMStringConversions, StringUtils};
     use compact_str::{format_compact, CompactString};
-    use serde::Deserialize;
+    use serde::{Deserialize, Serialize};
     use std::future::IntoFuture;
     use std::sync::Arc;
     use tokio::sync::RwLock;
@@ -402,7 +402,6 @@ mod tests {
     ///////////////////////////////////Queue Tests/////////////////////////////////////////////////
     use crate::cli::cli_utils::print_license_notice;
     use crate::core::clamp_index;
-    use crate::json::serialization::Serialize;
     use crate::net::tcp::LOCALHOST;
     use crate::threading::thread_primitives::{SafeTaskArgs, TaskItems, TaskResult};
     use crate::threading::threading_functions::sleep;
