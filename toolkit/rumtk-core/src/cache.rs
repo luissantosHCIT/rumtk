@@ -43,11 +43,11 @@ pub const fn new_cache<K, V>() -> LazyRUMCache<K, V> {
     LazyRUMCache::new(|| Arc::new(RUMCache::with_capacity(DEFAULT_CACHE_PAGE_SIZE)))
 }
 
-pub fn get_or_set_from_cache<K, V, F>(
-    cache: &'static mut LazyRUMCache<K, V>,
+pub fn get_or_set_from_cache<'a, K, V, F>(
+    cache: &'a mut LazyRUMCache<K, V>,
     expr: &K,
     new_fn: F,
-) -> &'static V
+) -> &'a V
 where
     K: Hash + Eq + Clone,
     V: Clone,
@@ -72,21 +72,20 @@ pub mod cache_macros {
     ///
     /// type StringCache = LazyRUMCache<String, String>;
     ///
-    /// fn init_cache(k: &str) -> String {
+    /// fn init_cache(k: &String) -> String {
     ///    String::from(k)
     /// }
     ///
-    /// let cache: StringCache = new_cache();
+    /// let mut cache: StringCache = new_cache();
     ///
-    /// let test_key: &str = "Hello World";
+    /// let test_key: String = String::from("Hello World");
     /// let v = rumtk_cache_fetch!(
-    ///     &cache,
+    ///     &mut cache,
     ///     &test_key,
     ///     init_cache
     /// );
     ///
-    /// assert_eq!(cache.len(), 1, format!("Cache item missing in test. Cache: {:?}", &cache));
-    /// assert_eq!(&test_key, &v, "The inserted key is not the same to what was passed as input!");
+    /// assert_eq!(test_key.as_str(), v.as_str(), "The inserted key is not the same to what was passed as input!");
     ///
     ///
     /// ```

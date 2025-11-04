@@ -127,9 +127,9 @@ pub mod python_utils {
     ///     Python::attach( |py| {
     ///             let example_arg_1 = 1;
     ///             let example_arg_2 = "Hello";
-    ///             let py_args: RUMPyList = py_new_args(py);
-    ///             py_push_arg(py, &py_args, example_arg_1.clone()).unwrap();
-    ///             py_push_arg(py, &py_args, example_arg_2.clone()).unwrap();
+    ///             let mut py_args: RUMPyList = py_new_args(py);
+    ///             py_push_arg(py, &mut py_args, &example_arg_1.clone()).unwrap();
+    ///             py_push_arg(py, &mut py_args, &example_arg_2.clone()).unwrap();
     ///             let arg_1: usize = py_args.bind(py).get_item(0).unwrap().extract().unwrap();
     ///             assert_eq!(&example_arg_1, &arg_1, "{}", format_compact!("Python list does not match the input list!\nGot: {:?}\nExpected: {:?}", &arg_1, &example_arg_1));
     ///         }
@@ -157,9 +157,9 @@ pub mod python_utils {
     ///     Python::attach( |py| {
     ///             let example_arg_1 = 1;
     ///             let example_arg_2 = "Hello";
-    ///             let py_args: RUMPyList = py_new_args(py);
-    ///             py_push_arg(py, &py_args, example_arg_1.clone()).unwrap();
-    ///             py_push_arg(py, &py_args, example_arg_2.clone()).unwrap();
+    ///             let mut py_args: RUMPyList = py_new_args(py);
+    ///             py_push_arg(py, &mut py_args, &example_arg_1.clone()).unwrap();
+    ///             py_push_arg(py, &mut py_args, &example_arg_2.clone()).unwrap();
     ///             let arg_1: usize = py_args.bind(py).get_item(0).unwrap().extract().unwrap();
     ///             assert_eq!(&example_arg_1, &arg_1, "{}", format_compact!("Python list does not match the input list!\nGot: {:?}\nExpected: {:?}", &arg_1, &example_arg_1));
     ///         }
@@ -168,7 +168,7 @@ pub mod python_utils {
     ///
     pub fn py_push_arg<'a, 'py, T>(
         py: RUMPython<'py>,
-        py_args: &RUMPyList,
+        py_args: &mut RUMPyList,
         arg: &T,
     ) -> RUMResult<()>
     where
@@ -457,9 +457,9 @@ pub mod python_utils {
     ///             let a = 5;
     ///             let b = 5.0;
     ///
-    ///             let args = py_new_args(py);
-    ///             py_push_arg(py, &args, &a);
-    ///             py_push_arg(py, &args, &b);
+    ///             let mut args = py_new_args(py);
+    ///             py_push_arg(py, &mut args, &a);
+    ///             py_push_arg(py, &mut args, &b);
     ///
     ///             let pymod: RUMPyModule = py_load(py, &module_fname).expect("Failure to load module!");
     ///
@@ -595,9 +595,9 @@ pub mod python_macros {
     ///         write(&module_fname, module_contents).expect("Failed to write file!");
     ///
     ///         let result = Python::attach(|py| -> RUMResult<f64> {
-    ///             let args = py_new_args(py);
-    ///             py_push_arg(py, &args, &a);
-    ///             py_push_arg(py, &args, &b);
+    ///             let mut args = py_new_args(py);
+    ///             py_push_arg(py, &mut args, &a);
+    ///             py_push_arg(py, &mut args, &b);
     ///
     ///             let result = rumtk_python_exec_module!(py, &module_fname, "test", &args);
     ///             let val: f64 = py_extract_any(py, &result)?;
@@ -809,9 +809,9 @@ pub mod python_macros {
     ///             let a = 5;
     ///             let b = 5.0;
     ///
-    ///             let args = py_new_args(py);
-    ///             py_push_arg(py, &args, &a);
-    ///             py_push_arg(py, &args, &b);
+    ///             let mut args = py_new_args(py);
+    ///             py_push_arg(py, &mut args, &a);
+    ///             py_push_arg(py, &mut args, &b);
     ///
     ///             let result = rumtk_python_exec_module!(py, &module_fname, "test", &args);
     ///             let val: f64 = py_extract_any(py, &result)?;
