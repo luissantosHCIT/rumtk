@@ -19,7 +19,7 @@
  */
 #![feature(inherent_associated_types)]
 #![feature(rustc_private)]
-
+#![feature(str_as_str)]
 extern crate rumtk_core;
 pub mod hl7_v2_base_types;
 pub mod hl7_v2_complex_types;
