@@ -50,7 +50,7 @@ pub mod v2_base_types {
     /// Basic type used to derive other types for the standard implementation.
     ///
     pub type V2String = RUMString;
-    #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
+    #[derive(Serialize, Deserialize, PartialEq, Debug, Clone)]
     pub struct V2ParserCharacters {
         pub segment_terminator: RUMString,
         pub field_separator: RUMString,
